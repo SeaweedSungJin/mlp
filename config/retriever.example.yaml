@@ -1,0 +1,18 @@
+# Example retriever configuration
+# type: eva_clip | clip_mlp
+
+# --- EVA-CLIP (original) ---
+type: eva_clip
+model_name: BAAI/EVA-CLIP-8B
+device: cuda:3
+faiss_gpu_id: 3
+torch_dtype: float16
+
+# --- CLIP (student) + MLP projector to EVA space ---
+# type: clip_mlp
+# student_model_name: openai/clip-vit-large-patch14-336
+# projector_path: ./eva_projector.pth
+# device: cuda:3
+# faiss_gpu_id: 3
+# torch_dtype: float16
+

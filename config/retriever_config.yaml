@@ -1,0 +1,23 @@
+# Image retriever (vision encoder) selection
+# type: eva_clip | clip_mlp
+#
+# Notes:
+# - The FAISS index dimension must match the query embedding dimension.
+# - Use `eva_clip` to run the original EVA-CLIP-8B image encoder.
+# - Use `clip_mlp` to run CLIP + MLP projector that maps to the EVA embedding space.
+
+## Default: original EVA-CLIP retrieval
+# type: eva_clip
+# device: cuda:3
+# faiss_gpu_id: 3
+# torch_dtype: float16
+# model_name: BAAI/EVA-CLIP-8B
+
+## Example: CLIP  + MLP projector
+type: clip_mlp
+device: cuda:3
+faiss_gpu_id: 3
+torch_dtype: float16
+student_model_name: openai/clip-vit-large-patch14-336
+projector_path: ./eva_projector.pth
+

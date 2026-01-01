@@ -1,0 +1,7 @@
+# General runtime toggles for SCOOP-RAG evaluation scripts
+log_samples: false #저장여부
+samples_dir: runs/samples
+samples_prefix: row
+samples_max_sections: 5
+samples_pretty_json: true
+vlm_max_new_tokens: 128

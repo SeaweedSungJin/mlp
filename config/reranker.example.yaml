@@ -1,0 +1,30 @@
+# Reranker configuration
+# type: which reranker to use. Supported: qformer, bge_text, cross_encoder
+
+# Example: Q-Former reranker (uses reranker.pth checkpoint via test scripts)
+type: qformer
+qformer_ckpt: ./reranker.pth
+qformer_device: cuda:3
+qformer_batch: 32
+alpha_1: 0.5  # retrieval score weight
+alpha_2: 0.5  # qformer score weight
+
+# Example: BGE text-only reranker
+# type: bge_text
+# model_name: BAAI/bge-reranker-large
+# bge_device: cuda:0
+# torch_dtype: float16
+# batch_size: 16
+# truncate_len: 512
+# alpha_1: 0.5  # retrieval score weight
+# alpha_2: 0.5  # bge score weight
+
+# Example: Cross-encoder text reranker
+# type: cross_encoder
+# model_name: cross-encoder/ms-marco-electra-base
+# ce_device: cuda:0
+# torch_dtype: float16
+# batch_size: 16
+# truncate_len: 512
+# alpha_1: 0.5  # retrieval score weight
+# alpha_2: 0.5  # cross-encoder score weight
