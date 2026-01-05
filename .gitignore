@@ -7,3 +7,5 @@ eva_projector_contrastive.pth
 eva_projector_diffusion.pth
 eva_projector_vqvae.pth
 eva_projector.pth
+eva_projector_1_layer.pth
+eva_projector_hybrid.pth

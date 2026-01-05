@@ -11,8 +11,41 @@ torch_dtype: float16
 # --- CLIP (student) + MLP projector to EVA space ---
 # type: clip_mlp
 # student_model_name: openai/clip-vit-large-patch14-336
-# projector_path: ./eva_projector.pth
+# projector_profile: mlp2
+# projector_profiles:
+#   mlp2:
+#     projector_type: mlp2
+#     projector_path: ./eva_projector.pth
+#     projector_kwargs:
+#       hidden_dims: [4096]
+#       dropout: 0.1
+#   mlp3:
+#     projector_type: mlp3
+#     projector_path: ./eva_projector_3_layer.pth
+#     projector_kwargs:
+#       hidden_dims: [4096, 4096]
+#       dropout: 0.1
+#   contrastive:
+#     projector_type: contrastive
+#     projector_path: ./eva_projector_contrastive.pth
+#     projector_kwargs:
+#       hidden_dims: [4096]
+#       dropout: 0.1
+#   diffusion:
+#     projector_type: diffusion
+#     projector_path: ./eva_projector_diffusion.pth
+#     projector_kwargs:
+#       diffusion_timesteps: 1000
+#       diffusion_steps: 50
+#       diffusion_beta_start: 0.0001
+#       diffusion_beta_end: 0.02
+#       diffusion_eta: 0.0
+#   vqvae:
+#     projector_type: vqvae
+#     projector_path: ./eva_projector_vqvae.pth
+#     projector_kwargs:
+#       commitment_cost: 0.25
+#       decay: 0.99
 # device: cuda:3
 # faiss_gpu_id: 3
 # torch_dtype: float16
-

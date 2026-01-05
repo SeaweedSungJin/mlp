@@ -83,7 +83,23 @@ def build_retriever(
 
     if cfg_type in {"clip_mlp", "clip-mlp"}:
         student_model_name = cfg.get("student_model_name", "openai/clip-vit-large-patch14-336")
-        projector_path_raw = cfg.get("projector_path", "./eva_projector.pth")
+        projector_profiles = cfg.get("projector_profiles") or {}
+        projector_profile = cfg.get("projector_profile")
+        if projector_profile:
+            if not isinstance(projector_profiles, dict):
+                raise ValueError("projector_profiles must be a mapping (dict) when projector_profile is set.")
+            profile_cfg = projector_profiles.get(projector_profile)
+            if not isinstance(profile_cfg, dict):
+                available = ", ".join(sorted(projector_profiles.keys()))
+                raise ValueError(f"Unknown projector_profile '{projector_profile}'. Available: {available}")
+        else:
+            profile_cfg = {}
+
+        projector_type = str(profile_cfg.get("projector_type", cfg.get("projector_type", "mlp2"))).strip().lower()
+        projector_kwargs = profile_cfg.get("projector_kwargs", cfg.get("projector_kwargs", {})) or {}
+        if not isinstance(projector_kwargs, dict):
+            raise ValueError("projector_kwargs must be a mapping (dict).")
+        projector_path_raw = profile_cfg.get("projector_path", cfg.get("projector_path", "./eva_projector.pth"))
         projector_path = _resolve_path(projector_path_raw, base=project_root)
         if not projector_path.exists():
             raise FileNotFoundError(f"Projector checkpoint not found: {projector_path}")
@@ -93,6 +109,8 @@ def build_retriever(
             torch_dtype=torch_dtype,
             student_model_name=student_model_name,
             projector_path=str(projector_path),
+            projector_type=projector_type,
+            projector_kwargs=projector_kwargs,
         )
         r_type = "clip_mlp"
         print(
@@ -100,12 +118,18 @@ def build_retriever(
             f" type=clip_mlp"
             f" student_model_name={student_model_name}"
             f" projector_path={projector_path}"
+            f" projector_type={projector_type}"
+            f" projector_profile={projector_profile or 'none'}"
             f" device={device}"
             f" torch_dtype={torch_dtype}"
             f" faiss_gpu_id={faiss_gpu_id}"
             f" CUDA_VISIBLE_DEVICES={os.getenv('CUDA_VISIBLE_DEVICES', '')}"
         )
-        return r_type, retriever, {"faiss_gpu_id": faiss_gpu_id, "projector_path": str(projector_path)}
+        return r_type, retriever, {
+            "faiss_gpu_id": faiss_gpu_id,
+            "projector_path": str(projector_path),
+            "projector_type": projector_type,
+            "projector_profile": projector_profile,
+        }
 
     raise ValueError(f"Unsupported retriever type: {cfg_type}")
-
