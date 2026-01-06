@@ -1,4 +1,5 @@
 from argparse import ArgumentParser
+from datetime import datetime
 import json
 import os
 from pathlib import Path
@@ -65,6 +66,7 @@ def run_test(
     dataset_start: int = 0,
     dataset_end: Optional[int] = None,
     dataset_limit: Optional[int] = None,
+    summary_path: Optional[str] = None,
     **kwargs,
 ):
     # === Dataset slicing ===
@@ -99,9 +101,13 @@ def run_test(
     project_root = Path(__file__).resolve().parent.parent
 
     # === Retriever or resume ===
+    retriever_type = None
+    retriever_params: dict = {}
+    retriever_cfg_path = None
     if kwargs["resume_from"] is not None:
         resumed_results = json.load(open(kwargs["resume_from"], "r"))
         kb_dict = json.load(open(knowledge_base_path, "r"))
+        retriever_type = "resume"
     else:
         retriever_device = kwargs.get("retriever_device", "cuda:3")
         retriever_cfg_raw = kwargs.get("retriever_cfg") or "config/retriever_config.yaml"
@@ -121,6 +127,7 @@ def run_test(
     recalls = {k: 0 for k in top_ks}
     reranked_recalls = {k: 0 for k in top_ks}
     hits = 0
+    retrieval_count = 0
     eval_score = 0
     vqa_total_count = 0
     vqa_correct_count = 0
@@ -363,6 +370,7 @@ def run_test(
                 float(top_k[i]["similarity"]) for i in range(retrieval_top_k)
                 if not (top_k[i]["url"] in seen or seen.add(top_k[i]["url"]))
             ]
+        retrieval_count += 1
         if kwargs["save_result"]:
             retrieval_result[data_id] = {
                 "retrieved_entries": [entry.url for entry in entries[:20]],
@@ -516,12 +524,75 @@ def run_test(
         with open(kwargs["save_result_path"], "w") as f:
             json.dump(retrieval_result, f, indent=4)
 
+    summary_top_ks = [k for k in (1, 5, 10, 20) if k in recalls]
+    retrieval_recall = {
+        f"recall@{k}": (recalls[k] / retrieval_count if retrieval_count else 0.0)
+        for k in summary_top_ks
+    }
+    reranked_recall = {
+        f"recall@{k}": (reranked_recalls[k] / retrieval_count if retrieval_count else 0.0)
+        for k in summary_top_ks
+    }
+
+    if retrieval_count:
+        print("========== Retrieval Recall (Image Search) ==========")
+        for k in summary_top_ks:
+            print(f"Recall@{k}: {recalls[k] / retrieval_count:.4f}")
+    else:
+        print("========== Retrieval Recall (Image Search) ==========")
+        print("No retrieval samples processed.")
+
     if evaluate_answers and vqa_total_count > 0:
         avg_bem = eval_score / vqa_total_count
         acc = vqa_correct_count / vqa_total_count
         print("========== Final VQA Summary ==========")
         print(f"Total: {vqa_total_count}, Correct: {vqa_correct_count}, Acc: {acc*100:.2f}%, Avg BEM: {avg_bem:.4f}")
 
+    summary_payload = {
+        "timestamp": datetime.now().isoformat(timespec="seconds"),
+        "dataset": {
+            "test_file": test_file_path,
+            "knowledge_base": knowledge_base_path,
+            "faiss_index": faiss_index_path,
+            "retrieval_top_k": retrieval_top_k,
+            "dataset_start": dataset_start,
+            "dataset_end": dataset_end,
+            "dataset_limit": dataset_limit,
+        },
+        "retriever": {
+            "type": retriever_type,
+            "retriever_vit": kwargs.get("retriever_vit"),
+            "cfg_path": str(retriever_cfg_path) if retriever_cfg_path is not None else None,
+            "device": kwargs.get("retriever_device"),
+            "faiss_gpu_id": retriever_params.get("faiss_gpu_id") if isinstance(retriever_params, dict) else None,
+            "projector_profile": retriever_params.get("projector_profile") if isinstance(retriever_params, dict) else None,
+            "projector_type": retriever_params.get("projector_type") if isinstance(retriever_params, dict) else None,
+            "projector_path": retriever_params.get("projector_path") if isinstance(retriever_params, dict) else None,
+        },
+        "recall": {
+            "retrieval": retrieval_recall,
+            "reranked": reranked_recall,
+        },
+        "vqa": {
+            "enabled": bool(evaluate_answers),
+            "total": vqa_total_count,
+            "correct": vqa_correct_count,
+            "acc": (vqa_correct_count / vqa_total_count) if vqa_total_count else None,
+            "avg_bem": (eval_score / vqa_total_count) if vqa_total_count else None,
+        },
+    }
+
+    summary_path = summary_path or kwargs.get("summary_path")
+    if summary_path:
+        summary_path = Path(summary_path)
+    else:
+        metrics_dir = project_root / "runs" / "metrics"
+        metrics_dir.mkdir(parents=True, exist_ok=True)
+        summary_path = metrics_dir / f"summary_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    summary_path.parent.mkdir(parents=True, exist_ok=True)
+    with summary_path.open("w", encoding="utf-8") as f:
+        json.dump(summary_payload, f, indent=2)
+    print(f"[Summary] Saved metrics to: {summary_path}")
 
 
 if __name__ == "__main__":
@@ -556,6 +627,7 @@ if __name__ == "__main__":
     parser.add_argument("--dataset_end", type=int, default=None)
     parser.add_argument("--dataset_limit", type=int, default=None)
     parser.add_argument("--runtime_config", type=str, default=None)
+    parser.add_argument("--summary_path", type=str, default=None)
     args = parser.parse_args()
 
     # Env fallbacks for slicing
@@ -622,6 +694,8 @@ if __name__ == "__main__":
     else:
         runtime_cfg = RuntimeConfig.default()
 
+    summary_path = args.summary_path or os.getenv("SUMMARY_PATH")
+
     test_config = {
         "test_file_path": args.test_file,
         "knowledge_base_path": args.knowledge_base,
@@ -652,6 +726,7 @@ if __name__ == "__main__":
         "dataset_end": dataset_end,
         "dataset_limit": dataset_limit,
         "runtime_config": runtime_cfg,
+        "summary_path": summary_path,
     }
     debug_config = dict(test_config)
     debug_config["perform_vqa"] = perform_vqa_effective
